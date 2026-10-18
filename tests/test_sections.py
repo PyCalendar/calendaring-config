@@ -41,7 +41,7 @@ def test_not_a_mapping_of_mappings_is_an_error(write_config: Write, text: str) -
         read_config(write_config(text))
 
 
-CONFIG = {
+CONFIG: dict[str, dict[str, Any]] = {
     "a": {"url": "https://a.example.com/"},
     "b": {"url": "https://b.example.com/"},
     "work_x": {"url": "https://x.example.com/"},
@@ -119,7 +119,10 @@ def test_load_returns_connections_without_structural_keys(write_config: Write) -
 def test_child_keys_win_over_inherited_ones(write_config: Write) -> None:
     [conn] = _load(
         write_config,
-        {"base": {"url": "https://a.example.com/", "username": "alice"}, "default": {"inherits": "base", "username": "bob"}},
+        {
+            "base": {"url": "https://a.example.com/", "username": "alice"},
+            "default": {"inherits": "base", "username": "bob"},
+        },
     )
     assert conn.params == {"url": "https://a.example.com/", "username": "bob"}
 

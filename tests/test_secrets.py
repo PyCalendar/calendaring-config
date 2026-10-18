@@ -98,11 +98,8 @@ def test_command_in_a_root_owned_file_is_run(write_config: Write, monkeypatch: p
 
 
 class _MemoryKeyring(keyring.backend.KeyringBackend):
-    priority = 1  # type: ignore[assignment]
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.store = {("fastmail", "alice@example.com"): "kr-secret"}
+    priority = 1
+    store = {("fastmail", "alice@example.com"): "kr-secret"}
 
     def get_password(self, service: str, username: str) -> str | None:
         return self.store.get((service, username))
@@ -117,7 +114,7 @@ class _MemoryKeyring(keyring.backend.KeyringBackend):
 @pytest.fixture
 def memory_keyring() -> Any:
     previous = keyring.get_keyring()
-    keyring.set_keyring(_MemoryKeyring())
+    keyring.set_keyring(_MemoryKeyring())  # type: ignore[no-untyped-call]  # keyring is untyped there
     yield
     keyring.set_keyring(previous)
 
