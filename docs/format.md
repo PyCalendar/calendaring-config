@@ -100,8 +100,10 @@ calendaring's `Backend.connect()`: `kind`, `url`, `username`, `password`,
 `token` and the backend's own options.
 
 - `kind` names the backend. Without it, the reader decides from `url`
-  (calendaring's `connect()` treats a path as files, `webcal:` as a feed,
-  and probes `http(s):`), and this package reports the kind as unknown.
+  (calendaring's `connect()` treats a path as files and `webcal:` as a
+  feed), and this package reports the kind as unknown. calendaring
+  cannot yet connect an `http(s):` URL without `kind`; probing it for a
+  feed or CalDAV is planned.
 - A section with `caldav_*` keys is an old-style caldav section and has
   `kind: caldav`. The prefix is dropped, and `caldav_user` and
   `caldav_pass` become `username` and `password`. Every `caldav_*` key
