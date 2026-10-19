@@ -8,6 +8,15 @@ at release time.
 
 .. towncrier release notes start
 
+0.3.0 (2026-10-20)
+------------------
+
+New features
+~~~~~~~~~~~~
+
+- A reader of some kinds only passes ``load(kinds=("caldav",))``: it gets only sections of those kinds (or of none), and a ``JMAP_URL`` in the environment no longer hides the file's CalDAV sections.  ``environment_connections()`` takes ``kinds`` too, and now resolves secrets such as ``CALDAV_PASSWORD_KEYRING`` itself, so its result holds ``password`` rather than its source.  ``section_connection()`` turns one section into a ``Connection``, for a reader that walks the file itself.
+
+
 0.2.0 (2026-10-19)
 ------------------
 
