@@ -77,3 +77,50 @@ def test_timeout_must_be_a_number(write_config: Write, monkeypatch: pytest.Monke
     monkeypatch.setenv("CALDAV_TIMEOUT", "soon")
     with pytest.raises(ConfigError, match="CALDAV_TIMEOUT"):
         load()
+
+
+def test_every_prefixed_variable_is_a_key(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_REQUIRE_TLS", "false")
+    monkeypatch.setenv("CALDAV_FEATURES", "radicale")
+    monkeypatch.setenv("JMAP_URL", "https://jmap-env.example.com/")
+    monkeypatch.setenv("JMAP_ACCOUNT_ID", "a1")
+    assert [c.params for c in load()] == [
+        {"url": "https://env.example.com/", "require_tls": "false", "features": "radicale"},
+        {"url": "https://jmap-env.example.com/", "account_id": "a1"},
+    ]
+
+
+def test_config_and_auth_variables_are_not_keys(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = write_config(CONFIG)
+    monkeypatch.setenv("CALDAV_CONFIG_SECTION", "fine")
+    monkeypatch.setenv("CALDAV_AUTH", "x")
+    monkeypatch.setenv("JMAP_AUTH", "x")
+    assert load(path)[0].params == {"url": "https://dav.example.com/", "password": "file"}
+    assert "auth" not in load(path, "jmap")[0].params
+
+
+def test_long_name_wins_over_the_alias(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_USER", "short")
+    monkeypatch.setenv("CALDAV_USERNAME", "long")
+    assert load()[0].params["username"] == "long"
+
+
+def test_only_secrets_have_sources(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = write_config({"default": {"kind": "caldav", "url": "https://dav.example.com/", "notify": "x"}})
+    monkeypatch.setenv("CALDAV_NOTIFY_COMMAND", "y")
+    assert load(path)[0].params["notify"] == "x"
+
+
+def test_config_alone_is_not_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_CONFIG", "x")
+    assert load()[0].params == {"url": "https://env.example.com/"}
+
+
+def test_repr_masks_secret_looking_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    for name in ("CALDAV_API_KEY", "CALDAV_CLIENT_SECRET", "CALDAV_PASSPHRASE", "CALDAV_ACCESS_TOKEN"):
+        monkeypatch.setenv(name, "s3cret")
+    assert "s3cret" not in repr(load())

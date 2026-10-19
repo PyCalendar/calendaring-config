@@ -31,6 +31,11 @@ def _is_new_style_key(key: str) -> bool:
     return key in ("url", "username", *SECRETS) or key.endswith(("_command", "_keyring"))
 
 
+def _looks_secret(key: str) -> bool:
+    """Masked in a ``repr``: the secrets, and keys named like one."""
+    return key in SECRETS or any(w in key for w in ("pass", "token", "secret")) or key.endswith("_key")
+
+
 @dataclass(frozen=True)
 class Connection:
     """One backend: its section, its kind, and the keyword arguments for its ``connect()``.
@@ -45,7 +50,7 @@ class Connection:
     params: dict[str, Any]
 
     def __repr__(self) -> str:
-        shown = {k: "***" if k in SECRETS else v for k, v in self.params.items()}
+        shown = {k: "***" if _looks_secret(k) else v for k, v in self.params.items()}
         return f"Connection(name={self.name!r}, kind={self.kind!r}, params={shown!r})"
 
 
@@ -204,6 +209,8 @@ def load(path: str | Path | None = None, section: str | None = None) -> list[Con
     """
     from_environment = environment_connections()
     if from_environment:
+        for _, params in from_environment:
+            resolve_secrets("environment", params, None)
         return [Connection("environment", kind, params) for kind, params in from_environment]
     file = find_config_file(path)
     if file is None:
