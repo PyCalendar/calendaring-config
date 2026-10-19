@@ -185,7 +185,10 @@ accepts is for the backend to check, not for this package.
 
 - A `CALDAV_URL` or `JMAP_URL` means the file is not read at all: the
   configuration is that one connection (or two, if both are set; the
-  CalDAV one first).
+  CalDAV one first). A reader of one kind only, such as caldav, counts
+  only the URL of its own kind: a `JMAP_URL` does not hide caldav's
+  sections from caldav, and sections of other kinds are not its
+  business.
 - Otherwise, when the name expands to exactly one section, the variables
   of that section's kind apply to it key by key: `CALDAV_PASSWORD` alone
   replaces the password and keeps the URL. A secret, or a source of one

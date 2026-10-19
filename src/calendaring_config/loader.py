@@ -4,6 +4,7 @@ import json
 import os
 import re
 import warnings
+from collections.abc import Iterable
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -12,11 +13,11 @@ from typing import Any
 import yaml
 
 from .discovery import find_config_file, requested_section, section_name
-from .environment import apply_environment, environment_connections
+from .environment import apply_environment, environment_connections, wanted_kinds
 from .errors import ConfigError
 from .secrets import SECRETS, resolve_secrets
 
-__all__ = ["Connection", "expand_env_vars", "expand_section", "load", "read_config"]
+__all__ = ["Connection", "expand_env_vars", "expand_section", "load", "read_config", "section_connection"]
 
 Config = dict[str, dict[str, Any]]
 
@@ -200,19 +201,46 @@ def _normalise(name: str, section: dict[str, Any]) -> tuple[str | None, dict[str
     return kind, {k: v for k, v in params.items() if v is not None}
 
 
-def load(path: str | Path | None = None, section: str | None = None, environment: bool = True) -> list[Connection]:
+def section_connection(name: str, section: dict[str, Any], path: str | Path | None = None) -> Connection:
+    """One section, already merged with what it ``inherits``, as a connection.
+
+    For a reader that walks the file itself.  ``path`` must be the file the
+    section really came from: a ``_command`` is run only after that file has
+    been checked, so without it a command is an error.  No environment
+    variable is applied.  Every other key is passed through, for the backend
+    to check.
+    """
+    if not isinstance(section, dict):
+        raise ConfigError(f"section {name} must be a mapping")
+    structural = sorted(k for k in ("inherits", "contains") if k in section)
+    if structural:
+        raise ConfigError(f"section {name} has {', '.join(structural)}: pass it merged, as a leaf")
+    kind, params = _normalise(name, section)
+    if path is None and any(f"{secret}_command" in params for secret in SECRETS):
+        raise ConfigError(f"section {name}: a _command needs the file the section came from")
+    resolve_secrets(name, params, Path(path) if path is not None else None)
+    return Connection(name, kind, params)
+
+
+def load(
+    path: str | Path | None = None,
+    section: str | None = None,
+    environment: bool = True,
+    kinds: Iterable[str] | None = None,
+) -> list[Connection]:
     """The connections a section stands for, ready for each backend's ``connect()``.
 
     A URL in the environment (``CALDAV_URL``, ``JMAP_URL``) replaces the file.
     No file and no such variable means no connections, and so does a file
     without a ``default`` section when no section was asked for.  With
     ``environment=False`` no ``CALDAV_*``, ``JMAP_*`` or ``CALENDARING_*``
-    variable is read.
+    variable is read.  A reader of some kinds only passes ``kinds``: then
+    only the URL of such a kind replaces the file, and only sections of
+    those kinds, or of none, are returned.
     """
-    from_environment = environment_connections() if environment else []
+    chosen = wanted_kinds(kinds)
+    from_environment = environment_connections(chosen) if environment else []
     if from_environment:
-        for _, params in from_environment:
-            resolve_secrets("environment", params, None)
         return [Connection("environment", kind, params) for kind, params in from_environment]
     file = find_config_file(path, environment)
     if file is None:
@@ -225,6 +253,8 @@ def load(path: str | Path | None = None, section: str | None = None, environment
     connections = []
     for leaf in leaves:
         kind, params = _normalise(leaf, _merged(config, leaf))
+        if chosen is not None and kind is not None and kind not in chosen:
+            continue
         if environment and len(leaves) == 1 and kind is not None:
             apply_environment(kind, params)
         resolve_secrets(leaf, params, file)

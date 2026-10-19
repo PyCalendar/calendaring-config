@@ -19,7 +19,10 @@ COMMAND_TIMEOUT = 60  # seconds; a helper waiting on a pinentry gets this long
 def _check_file_is_safe(path: Path | None, section: str, key: str) -> None:
     if path is None:  # from the environment, which cannot give a list
         return
-    st = path.stat()
+    try:
+        st = path.stat()
+    except OSError as e:
+        raise ConfigError(f"cannot check {path} before running {key} of section {section}: {e.strerror}") from None
     if st.st_uid not in (os.getuid(), 0):
         raise ConfigError(f"{path} is owned by uid {st.st_uid}; refusing to run {key} of section {section}")
     if st.st_mode & 0o022:

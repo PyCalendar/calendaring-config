@@ -35,7 +35,11 @@ for conn in load(section="everything"):
 reader should decide from the URL), and the keyword arguments for the
 backend's `connect()`. Old-style caldav files (`caldav_url`, …) are read
 unchanged. `load(environment=False)` reads no `CALDAV_*`, `JMAP_*` or
-`CALENDARING_*` variable. Errors are `ConfigError`, a `ValueError`.
+`CALENDARING_*` variable. `load(kinds=("caldav",))` returns only CalDAV
+sections and those without a kind, and lets only `CALDAV_URL` replace
+the file. A reader that walks the file itself turns one merged section
+into a `Connection` with `section_connection()`. Errors are
+`ConfigError`, a `ValueError`.
 
 The format is specified in [docs/format.md](docs/format.md).
 

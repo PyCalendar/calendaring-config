@@ -1,12 +1,13 @@
 """Environment variables, one connection of one kind (docs/format.md, "The environment")."""
 
 import os
+from collections.abc import Iterable
 from typing import Any
 
 from .errors import ConfigError
-from .secrets import SECRETS
+from .secrets import SECRETS, resolve_secrets
 
-__all__ = ["apply_environment", "environment_connections"]
+__all__ = ["apply_environment", "environment_connections", "wanted_kinds"]
 
 # Every PREFIX_<KEY> is the key <key> of a section of that kind
 PREFIXES = {"caldav": "CALDAV_", "jmap": "JMAP_"}
@@ -56,10 +57,27 @@ def _from_environment(kind: str) -> dict[str, Any]:
     return values
 
 
-def environment_connections() -> list[tuple[str, dict[str, Any]]]:
-    """``(kind, params)`` for each kind whose URL is in the environment."""
-    found = ((kind, _from_environment(kind)) for kind in PREFIXES)
-    return [(kind, params) for kind, params in found if "url" in params]
+def wanted_kinds(kinds: Iterable[str] | None) -> frozenset[str] | None:
+    """``kinds`` as a set, read once; a single string is refused rather than read letter by letter."""
+    if kinds is None:
+        return None
+    if isinstance(kinds, str):
+        raise ConfigError(f"kinds must be a collection of kind names, not the string {kinds!r}")
+    return frozenset(kinds)
+
+
+def environment_connections(kinds: Iterable[str] | None = None) -> list[tuple[str, dict[str, Any]]]:
+    """``(kind, params)`` for each kind (of ``kinds``, when given) whose URL is in the environment.
+
+    Secrets are resolved, as for a section of the file.
+    """
+    chosen = wanted_kinds(kinds)
+    wanted = [kind for kind in PREFIXES if chosen is None or kind in chosen]
+    found = ((kind, _from_environment(kind)) for kind in wanted)
+    connections = [(kind, params) for kind, params in found if "url" in params]
+    for _, params in connections:
+        resolve_secrets("environment", params, None)
+    return connections
 
 
 def apply_environment(kind: str, params: dict[str, Any]) -> None:
