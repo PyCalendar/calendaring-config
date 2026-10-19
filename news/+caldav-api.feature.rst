@@ -1,1 +1,0 @@
-``load(environment=False)`` reads no ``CALDAV_*``, ``JMAP_*`` or ``CALENDARING_*`` variable.  ``environment_connections()`` and ``expand_env_vars()`` are public, ``ConfigError`` is a ``ValueError``, and Python 3.10 is supported.
