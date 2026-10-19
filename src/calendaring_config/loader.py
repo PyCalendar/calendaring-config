@@ -16,7 +16,7 @@ from .environment import apply_environment, environment_connections
 from .errors import ConfigError
 from .secrets import SECRETS, resolve_secrets
 
-__all__ = ["Connection", "expand_section", "load", "read_config"]
+__all__ = ["Connection", "expand_env_vars", "expand_section", "load", "read_config"]
 
 Config = dict[str, dict[str, Any]]
 
@@ -29,6 +29,11 @@ GLOB_CHARACTERS = frozenset("*?[")
 def _is_new_style_key(key: str) -> bool:
     """A connection key an old-style section must spell with the prefix; other plain keys may stand beside it."""
     return key in ("url", "username", *SECRETS) or key.endswith(("_command", "_keyring"))
+
+
+def _looks_secret(key: str) -> bool:
+    """Masked in a ``repr``: the secrets, and keys named like one."""
+    return key in SECRETS or any(w in key for w in ("pass", "token", "secret")) or key.endswith("_key")
 
 
 @dataclass(frozen=True)
@@ -45,7 +50,7 @@ class Connection:
     params: dict[str, Any]
 
     def __repr__(self) -> str:
-        shown = {k: "***" if k in SECRETS else v for k, v in self.params.items()}
+        shown = {k: "***" if _looks_secret(k) else v for k, v in self.params.items()}
         return f"Connection(name={self.name!r}, kind={self.kind!r}, params={shown!r})"
 
 
@@ -195,28 +200,32 @@ def _normalise(name: str, section: dict[str, Any]) -> tuple[str | None, dict[str
     return kind, {k: v for k, v in params.items() if v is not None}
 
 
-def load(path: str | Path | None = None, section: str | None = None) -> list[Connection]:
+def load(path: str | Path | None = None, section: str | None = None, environment: bool = True) -> list[Connection]:
     """The connections a section stands for, ready for each backend's ``connect()``.
 
     A URL in the environment (``CALDAV_URL``, ``JMAP_URL``) replaces the file.
     No file and no such variable means no connections, and so does a file
-    without a ``default`` section when no section was asked for.
+    without a ``default`` section when no section was asked for.  With
+    ``environment=False`` no ``CALDAV_*``, ``JMAP_*`` or ``CALENDARING_*``
+    variable is read.
     """
-    from_environment = environment_connections()
+    from_environment = environment_connections() if environment else []
     if from_environment:
+        for _, params in from_environment:
+            resolve_secrets("environment", params, None)
         return [Connection("environment", kind, params) for kind, params in from_environment]
-    file = find_config_file(path)
+    file = find_config_file(path, environment)
     if file is None:
         return []
     config = read_config(file)
-    name = section_name(section)
-    if requested_section(section) is None and name not in config:
+    name = section_name(section, environment)
+    if requested_section(section, environment) is None and name not in config:
         return []
     leaves = expand_section(config, name)
     connections = []
     for leaf in leaves:
         kind, params = _normalise(leaf, _merged(config, leaf))
-        if len(leaves) == 1 and kind is not None:
+        if environment and len(leaves) == 1 and kind is not None:
             apply_environment(kind, params)
         resolve_secrets(leaf, params, file)
         connections.append(Connection(leaf, kind, params))

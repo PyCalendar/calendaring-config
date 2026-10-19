@@ -7,7 +7,7 @@ name = "calendaring-config"
 dynamic = ["version"]
 description = "The shared configuration file of caldav, calendaring and calendaring-jmap: format, discovery and credentials"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = "GPL-3.0-or-later OR Apache-2.0"
 license-files = ["COPYING.*"]
 authors = [{ name = "Tobias Brox", email = "tobias@redpill-linpro.com" }]
@@ -15,6 +15,7 @@ classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -61,7 +62,7 @@ exclude = ["/.github", "/.claude", "tmp-*", "*~", "*.bak"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4", "PT"]
@@ -74,7 +75,7 @@ known-first-party = ["calendaring_config"]
 # The package ships py.typed and says Typing :: Typed, so CI checks it.
 strict = true
 # Check as the oldest supported Python, like ruff's target-version
-python_version = "3.11"
+python_version = "3.10"
 files = ["src", "tests"]
 
 [tool.pytest.ini_options]

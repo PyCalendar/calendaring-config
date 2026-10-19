@@ -34,7 +34,8 @@ for conn in load(section="everything"):
 `Connection` per backend: its section name, its kind (or `None`, when the
 reader should decide from the URL), and the keyword arguments for the
 backend's `connect()`. Old-style caldav files (`caldav_url`, …) are read
-unchanged.
+unchanged. `load(environment=False)` reads no `CALDAV_*`, `JMAP_*` or
+`CALENDARING_*` variable. Errors are `ConfigError`, a `ValueError`.
 
 The format is specified in [docs/format.md](docs/format.md).
 

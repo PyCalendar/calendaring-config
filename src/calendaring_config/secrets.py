@@ -16,7 +16,9 @@ SECRETS = ("password", "token")
 COMMAND_TIMEOUT = 60  # seconds; a helper waiting on a pinentry gets this long
 
 
-def _check_file_is_safe(path: Path, section: str, key: str) -> None:
+def _check_file_is_safe(path: Path | None, section: str, key: str) -> None:
+    if path is None:  # from the environment, which cannot give a list
+        return
     st = path.stat()
     if st.st_uid not in (os.getuid(), 0):
         raise ConfigError(f"{path} is owned by uid {st.st_uid}; refusing to run {key} of section {section}")
@@ -24,7 +26,7 @@ def _check_file_is_safe(path: Path, section: str, key: str) -> None:
         raise ConfigError(f"{path} is writable by group or others; refusing to run {key} of section {section}")
 
 
-def _run(command: Any, section: str, key: str, path: Path) -> str:
+def _run(command: Any, section: str, key: str, path: Path | None) -> str:
     if not isinstance(command, list) or not command or not all(isinstance(a, str) for a in command):
         raise ConfigError(f"{key} of section {section} must be a list of the program and its arguments")
     _check_file_is_safe(path, section, key)
@@ -60,7 +62,7 @@ def _look_up(service: Any, username: Any, section: str, key: str) -> str:
     return secret
 
 
-def resolve_secrets(section: str, params: dict[str, Any], path: Path) -> None:
+def resolve_secrets(section: str, params: dict[str, Any], path: Path | None) -> None:
     """Replace ``password_command``, ``token_keyring`` and the like in ``params`` with the secret."""
     for secret in SECRETS:
         command, keyring_key = f"{secret}_command", f"{secret}_keyring"

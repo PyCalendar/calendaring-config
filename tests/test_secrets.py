@@ -149,3 +149,46 @@ def test_keyring_package_missing(write_config: Write, monkeypatch: pytest.Monkey
     monkeypatch.setitem(sys.modules, "keyring", None)
     with pytest.raises(ConfigError, match=r"calendaring-config\[keyring\]"):
         _params(write_config, {"url": "x", "username": "alice", "password_keyring": "fastmail"})
+
+
+@pytest.mark.usefixtures("memory_keyring")
+def test_keyring_from_the_environment(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_PASSWORD_KEYRING", "fastmail")
+    path = write_config(
+        {
+            "default": {
+                "kind": "caldav",
+                "url": "https://dav.example.com/",
+                "username": "alice@example.com",
+                "password": "file",
+            }
+        }
+    )
+    assert load(path)[0].params["password"] == "kr-secret"
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_USERNAME", "alice@example.com")
+    assert load()[0].params == {
+        "url": "https://env.example.com/",
+        "username": "alice@example.com",
+        "password": "kr-secret",
+    }
+
+
+def test_command_from_the_environment_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_PASSWORD_COMMAND", "pass show dav")
+    with pytest.raises(ConfigError, match="must be a list"):
+        load()
+
+
+def test_two_sources_in_the_environment(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_PASSWORD", "env")
+    monkeypatch.setenv("CALDAV_PASSWORD_KEYRING", "fastmail")
+    path = write_config(
+        {"default": {"kind": "caldav", "url": "https://dav.example.com/", "username": "alice@example.com"}}
+    )
+    with pytest.raises(ConfigError, match="more than once"):
+        load(path)
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    with pytest.raises(ConfigError, match="more than once"):
+        load()

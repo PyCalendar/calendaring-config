@@ -115,6 +115,14 @@ calendaring's `Backend.connect()`: `kind`, `url`, `username`, `password`,
 - An explicit `kind` other than `caldav` beside `caldav_*` keys is an
   error.
 
+Each backend checks the keys it is given, and should warn about one it
+does not know. Some keys are not a backend's, and a backend passes them by:
+
+- `test_*` is for test tooling, such as caldav's `test_allowed` and
+  `test_priority`. calendaring drops these keys before it connects.
+- `x_*` is for an application's own settings.
+- `extra_config` is plann's, from before `x_*`.
+
 ## Values
 
 `${VAR}` in a string is replaced with the environment variable `VAR`, or
@@ -156,27 +164,34 @@ Error messages name the section and the key, never the secret.
 ## The environment
 
 Environment variables describe one connection of one kind, and win over
-the file:
+the file. Every variable starting with the kind's prefix, `CALDAV_` or
+`JMAP_`, is a key of that section, its name lower-cased:
+`CALDAV_SSL_VERIFY_CERT` is `ssl_verify_cert`, and `CALDAV_PASSWORD` is
+`password`, exactly as if it were written in the file. `CALDAV_USER` and
+`CALDAV_PASS` are short for `username` and `password`; the long name wins
+when both are set. Other kinds have no variables. These are not keys:
 
-| kind | variables |
-|---|---|
-| `caldav` | `CALDAV_URL`, `CALDAV_USERNAME` (or `CALDAV_USER`), `CALDAV_PASSWORD` (or `CALDAV_PASS`), `CALDAV_PROXY`, `CALDAV_TIMEOUT`, `CALDAV_AUTH_TYPE`, `CALDAV_SSL_VERIFY_CERT`, `CALDAV_SSL_CERT` |
-| `jmap` | `JMAP_URL`, `JMAP_USERNAME`, `JMAP_PASSWORD`, `JMAP_AUTH_TYPE`, `JMAP_TIMEOUT` |
+- `<PREFIX>CONFIG_*`, such as `CALDAV_CONFIG_FILE`, which choose the file
+  and the section;
+- `<PREFIX>AUTH`, since `auth` is an object, not a string.
 
-Other kinds have none. The list is deliberately shorter than caldav's,
-which maps every `CALDAV_<KEY>` its client takes. Values are strings, so
-`CALDAV_SSL_VERIFY_CERT=false` is the string `"false"`, as in caldav;
-only the timeouts become numbers, and a value that is not a number is an
-error. An empty value counts (a server may need an empty password),
-except for the URL.
+Values are strings; only `timeout` becomes a number, and a value that is
+not a number is an error. Any other conversion is the backend's:
+`CALDAV_SSL_VERIFY_CERT=false` reaches caldav as the string `"false"`. A
+`_command` from the environment is a string, which is an error (see
+"Secrets"). An empty value counts (a server may need an empty password),
+except for the URL. Like the keys in the file, which keys a backend
+accepts is for the backend to check, not for this package.
 
 - A `CALDAV_URL` or `JMAP_URL` means the file is not read at all: the
   configuration is that one connection (or two, if both are set; the
   CalDAV one first).
 - Otherwise, when the name expands to exactly one section, the variables
   of that section's kind apply to it key by key: `CALDAV_PASSWORD` alone
-  replaces the password and keeps the URL. A secret from the environment
-  replaces the section's `_command` or `_keyring`, which is then not run.
+  replaces the password and keeps the URL. A secret, or a source of one
+  such as `CALDAV_PASSWORD_KEYRING`, from the environment replaces the
+  section's other sources of it, which are then not run. Two sources of
+  one secret in the environment are an error, as in the file.
 - When the name expands to several sections, the variables without a URL
   are not applied.
 

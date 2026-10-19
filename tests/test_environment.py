@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+import yaml
 
 from calendaring_config import ConfigError, Connection, load
 
@@ -77,3 +78,77 @@ def test_timeout_must_be_a_number(write_config: Write, monkeypatch: pytest.Monke
     monkeypatch.setenv("CALDAV_TIMEOUT", "soon")
     with pytest.raises(ConfigError, match="CALDAV_TIMEOUT"):
         load()
+
+
+def test_every_prefixed_variable_is_a_key(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_REQUIRE_TLS", "false")
+    monkeypatch.setenv("CALDAV_FEATURES", "radicale")
+    monkeypatch.setenv("JMAP_URL", "https://jmap-env.example.com/")
+    monkeypatch.setenv("JMAP_ACCOUNT_ID", "a1")
+    assert [c.params for c in load()] == [
+        {"url": "https://env.example.com/", "require_tls": "false", "features": "radicale"},
+        {"url": "https://jmap-env.example.com/", "account_id": "a1"},
+    ]
+
+
+def test_config_and_auth_variables_are_not_keys(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = write_config(CONFIG)
+    monkeypatch.setenv("CALDAV_CONFIG_SECTION", "fine")
+    monkeypatch.setenv("CALDAV_AUTH", "x")
+    monkeypatch.setenv("JMAP_AUTH", "x")
+    assert load(path)[0].params == {"url": "https://dav.example.com/", "password": "file"}
+    assert "auth" not in load(path, "jmap")[0].params
+
+
+def test_long_name_wins_over_the_alias(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_USER", "short")
+    monkeypatch.setenv("CALDAV_USERNAME", "long")
+    assert load()[0].params["username"] == "long"
+
+
+def test_only_secrets_have_sources(write_config: Write, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = write_config({"default": {"kind": "caldav", "url": "https://dav.example.com/", "notify": "x"}})
+    monkeypatch.setenv("CALDAV_NOTIFY_COMMAND", "y")
+    assert load(path)[0].params["notify"] == "x"
+
+
+def test_config_alone_is_not_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_CONFIG", "x")
+    assert load()[0].params == {"url": "https://env.example.com/"}
+
+
+def test_repr_masks_secret_looking_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    for name in ("CALDAV_API_KEY", "CALDAV_CLIENT_SECRET", "CALDAV_PASSPHRASE", "CALDAV_ACCESS_TOKEN"):
+        monkeypatch.setenv(name, "s3cret")
+    assert "s3cret" not in repr(load())
+
+
+def test_environment_can_be_left_out(write_config: Write, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    path = write_config(CONFIG)
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("CALDAV_PASSWORD", "from-env")
+    monkeypatch.setenv("CALDAV_CONFIG_SECTION", "jmap")
+    monkeypatch.setenv("CALDAV_CONFIG_FILE", str(tmp_path / "missing.yaml"))
+    [conn] = load(path, "fine", environment=False)
+    assert conn.params == {"url": "https://dav.example.com/", "password": "file"}
+    home_config = Path.home() / ".config" / "caldav" / "calendar.conf"
+    home_config.parent.mkdir(parents=True)
+    home_config.write_text(yaml.safe_dump({"jmap": CONFIG["jmap"]}))
+    assert load(environment=False) == []  # no default section, CALDAV_CONFIG_SECTION not read
+
+
+def test_public_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    from calendaring_config import environment_connections, expand_env_vars
+
+    monkeypatch.setenv("CALDAV_URL", "https://env.example.com/")
+    monkeypatch.setenv("WHO", "alice")
+    assert environment_connections() == [("caldav", {"url": "https://env.example.com/"})]
+    assert expand_env_vars({"user": "${WHO}"}) == {"user": "alice"}
+
+
+def test_config_error_is_a_value_error() -> None:
+    assert issubclass(ConfigError, ValueError)
