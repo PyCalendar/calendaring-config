@@ -29,12 +29,12 @@ def search_path() -> list[Path]:
     ]
 
 
-def find_config_file(path: str | Path | None = None) -> Path | None:
+def find_config_file(path: str | Path | None = None, environment: bool = True) -> Path | None:
     """The configuration file to read, or ``None`` when there is none.
 
     A file named by ``path`` or by an environment variable must exist.
     """
-    if path is None:
+    if path is None and environment:
         path = next((os.environ[v] for v in FILE_VARIABLES if os.environ.get(v)), None)
     if path is not None:
         named = Path(path).expanduser()
@@ -44,13 +44,13 @@ def find_config_file(path: str | Path | None = None) -> Path | None:
     return next((p for p in search_path() if p.is_file()), None)
 
 
-def requested_section(name: str | None = None) -> str | None:
+def requested_section(name: str | None = None, environment: bool = True) -> str | None:
     """``name``, else the section named in the environment, else ``None``."""
-    if name:
-        return name
+    if name or not environment:
+        return name or None
     return next((os.environ[v] for v in SECTION_VARIABLES if os.environ.get(v)), None)
 
 
-def section_name(name: str | None = None) -> str:
+def section_name(name: str | None = None, environment: bool = True) -> str:
     """``name``, else the section named in the environment, else ``default``."""
-    return requested_section(name) or "default"
+    return requested_section(name, environment) or "default"
