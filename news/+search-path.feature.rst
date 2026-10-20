@@ -1,0 +1,1 @@
+``search_path()`` is public, for a tool that creates a new configuration file: its first entry is where the file belongs.  ``section_connection()`` and ``read_config()`` expand ``~`` in the path they are given.

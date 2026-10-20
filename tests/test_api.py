@@ -108,3 +108,38 @@ def test_section_connection_wants_a_merged_section(monkeypatch: pytest.MonkeyPat
         section_connection("w", ["not", "a", "section"])  # type: ignore[arg-type]
     monkeypatch.setenv("CALDAV_PASSWORD", "env")
     assert section_connection("w", {"kind": "caldav", "url": "u"}).params == {"url": "u"}
+
+
+def test_search_path_is_public() -> None:
+    from calendaring_config import search_path
+
+    assert search_path()[0] == Path.home() / ".config" / "pycal" / "calendar.yaml"
+
+
+def test_section_connection_expands_the_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = tmp_path / "calendar.yaml"
+    path.write_text("")
+    path.chmod(0o600)
+    section = {"caldav_url": "https://dav.example.com/", "caldav_password_command": PRINT}
+    assert section_connection("w", section, "~/calendar.yaml").params["password"] == "s3cret"
+
+
+def test_read_config_expands_the_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from calendaring_config import read_config
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / "calendar.yaml").write_text("work:\n  url: u\n")
+    assert read_config("~/calendar.yaml") == {"work": {"url": "u"}}
+
+
+def test_unknown_user_in_path_is_a_config_error() -> None:
+    from calendaring_config import find_config_file, read_config
+
+    for call in (
+        lambda: read_config("~nosuchuser.invalid/c.yaml"),
+        lambda: find_config_file("~nosuchuser.invalid/c.yaml"),
+        lambda: section_connection("w", {"url": "u", "password_command": PRINT}, "~nosuchuser.invalid/c.yaml"),
+    ):
+        with pytest.raises(ConfigError, match="nosuchuser"):
+            call()

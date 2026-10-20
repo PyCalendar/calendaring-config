@@ -12,7 +12,7 @@ from typing import Any
 
 import yaml
 
-from .discovery import find_config_file, requested_section, section_name
+from .discovery import expand_path, find_config_file, requested_section, section_name
 from .environment import apply_environment, environment_connections, wanted_kinds
 from .errors import ConfigError
 from .secrets import SECRETS, resolve_secrets
@@ -58,7 +58,7 @@ class Connection:
 def read_config(path: str | Path) -> Config:
     """The file's sections: JSON, else YAML read with a safe loader."""
     try:
-        with open(path, "rb") as f:
+        with open(expand_path(path), "rb") as f:
             raw = f.read()
     except OSError as e:
         raise ConfigError(f"cannot read {path}: {e.strerror}") from e
@@ -218,7 +218,7 @@ def section_connection(name: str, section: dict[str, Any], path: str | Path | No
     kind, params = _normalise(name, section)
     if path is None and any(f"{secret}_command" in params for secret in SECRETS):
         raise ConfigError(f"section {name}: a _command needs the file the section came from")
-    resolve_secrets(name, params, Path(path) if path is not None else None)
+    resolve_secrets(name, params, expand_path(path) if path is not None else None)
     return Connection(name, kind, params)
 
 
