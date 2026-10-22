@@ -3,6 +3,7 @@
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -148,7 +149,7 @@ def test_unknown_user_in_path_is_a_config_error() -> None:
 def test_merged_section_is_a_leaf() -> None:
     from calendaring_config import merged_section
 
-    config = {
+    config: dict[str, dict[str, Any]] = {
         "base": {"kind": "caldav", "url": "https://dav.example.com/", "contains": ["x"], "disable": True},
         "parent": {"inherits": "base", "username": "alice"},
         "default": {"inherits": "parent", "username": "bob"},
@@ -170,7 +171,7 @@ def test_merged_section_keeps_its_own_contains_and_disable() -> None:
     and the caller can still see that a section is disabled."""
     from calendaring_config import merged_section
 
-    config = {
+    config: dict[str, dict[str, Any]] = {
         "base": {"url": "https://dav.example.com/"},
         "meta": {"inherits": "base", "contains": ["base"]},
         "off": {"inherits": "base", "disable": True},
