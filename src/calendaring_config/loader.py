@@ -17,7 +17,15 @@ from .environment import apply_environment, environment_connections, wanted_kind
 from .errors import ConfigError
 from .secrets import SECRETS, resolve_secrets
 
-__all__ = ["Connection", "expand_env_vars", "expand_section", "load", "read_config", "section_connection"]
+__all__ = [
+    "Connection",
+    "expand_env_vars",
+    "expand_section",
+    "load",
+    "merged_section",
+    "read_config",
+    "section_connection",
+]
 
 Config = dict[str, dict[str, Any]]
 
@@ -151,6 +159,8 @@ def _merged(config: Config, name: str, chain: tuple[str, ...] = ()) -> dict[str,
     if name in chain:
         raise ConfigError(f"inheritance cycle: {' -> '.join((*chain, name))}")
     if name not in config:
+        if not chain:
+            raise ConfigError(f"no section named {name}")
         raise ConfigError(f"section {chain[-1]} inherits from {name}, which does not exist")
     own = config[name]
     if "inherits" not in own:
@@ -165,6 +175,18 @@ def _merged(config: Config, name: str, chain: tuple[str, ...] = ()) -> dict[str,
     for key in ("contains", "disable"):
         parent.pop(key, None)
     return {**parent, **own}
+
+
+def merged_section(config: Config, name: str) -> dict[str, Any]:
+    """Section ``name`` with what it ``inherits`` copied in.
+
+    ``inherits`` itself is left out, and so are the parents' ``contains``
+    and ``disable``, so a leaf can go to ``section_connection()``.  The
+    section's own ``contains`` and ``disable`` are kept: a meta-section is
+    still refused there, and the caller can see that a section is disabled.
+    The result is a shallow copy; ``config`` is not modified.
+    """
+    return {k: v for k, v in _merged(config, name).items() if k != "inherits"}
 
 
 def expand_env_vars(value: Any) -> Any:
