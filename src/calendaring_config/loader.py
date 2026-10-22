@@ -185,6 +185,11 @@ def merged_section(config: Config, name: str) -> dict[str, Any]:
     section's own ``contains`` and ``disable`` are kept: a meta-section is
     still refused there, and the caller can see that a section is disabled.
     The result is a shallow copy; ``config`` is not modified.
+
+    It exists for caldav's ``config_section()``, and may be deprecated
+    once plann no longer uses that function
+    (https://github.com/PyCalendar/plann/issues/84).  Callers that can
+    should use ``load()``, which does the whole walk.
     """
     return {k: v for k, v in _merged(config, name).items() if k != "inherits"}
 
