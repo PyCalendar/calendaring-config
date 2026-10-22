@@ -37,9 +37,12 @@ backend's `connect()`. Old-style caldav files (`caldav_url`, …) are read
 unchanged. `load(environment=False)` reads no `CALDAV_*`, `JMAP_*` or
 `CALENDARING_*` variable. `load(kinds=("caldav",))` returns only CalDAV
 sections and those without a kind, and lets only `CALDAV_URL` replace
-the file. A reader that walks the file itself turns one merged section
-into a `Connection` with `section_connection()`, and finds the file
-with `find_config_file()`; `search_path()` lists where it looks, the
+the file. A reader that walks the file itself turns one section into a
+`Connection` with `section_connection()`, after merging what it
+`inherits` with `merged_section()` (kept for caldav's `config_section()`;
+it may be deprecated once plann no longer uses that function,
+https://github.com/PyCalendar/plann/issues/84). `find_config_file()`
+finds the file; `search_path()` lists where it looks, the
 first entry being where a new file belongs. Errors are `ConfigError`, a
 `ValueError`.
 

@@ -3,6 +3,7 @@
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -143,3 +144,38 @@ def test_unknown_user_in_path_is_a_config_error() -> None:
     ):
         with pytest.raises(ConfigError, match="nosuchuser"):
             call()
+
+
+def test_merged_section_is_a_leaf() -> None:
+    from calendaring_config import merged_section
+
+    config: dict[str, dict[str, Any]] = {
+        "base": {"kind": "caldav", "url": "https://dav.example.com/", "contains": ["x"], "disable": True},
+        "parent": {"inherits": "base", "username": "alice"},
+        "default": {"inherits": "parent", "username": "bob"},
+        "x": {},
+    }
+    original = {name: dict(section) for name, section in config.items()}
+    merged = merged_section(config, "default")
+    assert merged == {"kind": "caldav", "url": "https://dav.example.com/", "username": "bob"}
+    assert section_connection("default", merged).params == {"url": "https://dav.example.com/", "username": "bob"}
+    assert config == original  # no section modified
+    with pytest.raises(ConfigError, match="nosuch"):
+        merged_section({"default": {"inherits": "nosuch"}}, "default")
+    with pytest.raises(ConfigError, match="no section named nosuch"):
+        merged_section(config, "nosuch")
+
+
+def test_merged_section_keeps_its_own_contains_and_disable() -> None:
+    """A meta-section stays one, so section_connection() still refuses it,
+    and the caller can still see that a section is disabled."""
+    from calendaring_config import merged_section
+
+    config: dict[str, dict[str, Any]] = {
+        "base": {"url": "https://dav.example.com/"},
+        "meta": {"inherits": "base", "contains": ["base"]},
+        "off": {"inherits": "base", "disable": True},
+    }
+    with pytest.raises(ConfigError, match="merged"):
+        section_connection("meta", merged_section(config, "meta"))
+    assert merged_section(config, "off") == {"url": "https://dav.example.com/", "disable": True}
