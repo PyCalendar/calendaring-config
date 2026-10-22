@@ -8,6 +8,15 @@ at release time.
 
 .. towncrier release notes start
 
+0.5.0 (2026-10-22)
+------------------
+
+New features
+~~~~~~~~~~~~
+
+- ``merged_section(config, name)`` is public: the section with what it ``inherits`` copied in and ``inherits`` left out, ready for ``section_connection()`` when it is a leaf.  Its own ``contains`` and ``disable`` are kept, so ``section_connection()`` still refuses a meta-section.  It is there for caldav's ``config_section()``, and may be deprecated in a later release once plann no longer uses that function (https://github.com/PyCalendar/plann/issues/84); callers that can should use ``load()``, which does the whole walk.
+
+
 0.4.0 (2026-10-20)
 ------------------
 
